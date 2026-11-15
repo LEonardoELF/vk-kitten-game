@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Волшебный Котенок и Жемчуг — 10 Уровней + Бесконечный режим</title>
+    <!-- Подключаем официальную библиотеку VK Bridge -->
+    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body {
+            background-color: #0f172a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+        }
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 16 / 9;
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 14px 22px;
+        }
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(6px);
+            padding: 8px 18px;
+            border-radius: 24px;
+            font-size: 16px;
+            font-weight: 700;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .hud span { color: #fde047; }
+        #records-btn {
+            pointer-events: auto;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #fde047;
+            padding: 4px 12px;
+            font-size: 14px;
+            border-radius: 14px;
+            cursor: pointer;
+            box-shadow: none;
+        }
+        #records-btn:hover { background: rgba(255, 255, 255, 0.28); transform: none; }
+
+        /* Моргающая надпись DEBUG на весь экран */
+        #debug-banner {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+            z-index: 50;
+            font-size: 110px;
+            font-weight: 900;
+            letter-spacing: 10px;
+            color: rgba(239, 68, 68, 0.42);
+            text-shadow: 0 0 25px rgba(239, 68, 68, 0.7);
+            animation: debugBlink 0.9s infinite alternate;
+        }
+        @keyframes debugBlink {
+            0% { opacity: 0.18; transform: scale(0.98); }
+            100% { opacity: 0.92; transform: scale(1.02); }
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(6px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            pointer-events: auto;
+            padding: 14px 20px;
+            overflow-y: auto;
+            z-index: 20;
+        }
+        h1 { font-size: 26px; margin-bottom: 8px; color: #fb923c; text-shadow: 0 2px 10px rgba(0,0,0,0.6); }
+        #status-img {
+            width: 100%;
+            max-width: 310px;
+            aspect-ratio: 16 / 9;
+            object-fit: cover;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            border: 3px solid #fb923c;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            display: none;
+        }
+        p { font-size: 15px; margin-bottom: 14px; max-width: 560px; line-height: 1.4; color: #f8fafc; white-space: pre-line; }
+        
+        /* Таблица рекордов */
+        #leaderboard-box {
+            display: none;
+            width: 100%;
+            max-width: 400px;
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid rgba(251, 146, 60, 0.5);
+            border-radius: 12px;
+            padding: 10px 16px;
+            margin-bottom: 14px;
+        }
+        #leaderboard-box h3 {
+            color: #fde047;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        .record-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 14px;
+        }
+        .record-row:last-child { border-bottom: none; }
+        .record-row span:last-child { color: #fde047; font-weight: bold; }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        button {
+            background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+            color: #fff;
+            border: none;
+            padding: 11px 28px;
+            font-size: 17px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(234, 88, 12, 0.5);
+            transition: transform 0.15s, box-shadow 0.2s;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(234, 88, 12, 0.7); }
+        button:active { transform: translateY(1px); }
+        button.secondary-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            box-shadow: none;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas" width="800" height="450"></canvas>
+    <div id="debug-banner">DEBUG!</div>
+    <div id="ui-layer">
+        <div class="hud">
+            <div>Уровень: <span id="level-display">1</span></div>
+            <div>Жемчуг: <span id="pearls-display">0</span>/<span id="target-display">8</span></div>
+            <div>Рекорд (Ур.11): <span id="best-display">0</span></div>
+            <div>Жизни: <span id="lives-display">❤️❤️❤️</span></div>
+            <button id="records-btn">🏆 Рекорды</button>
+        </div>
+    </div>
+    <div id="overlay">
+        <h1 id="overlay-title">Волшебный Котенок</h1>
+        <img id="status-img" src="" alt="Иллюстрация состояния">
+        <p id="overlay-desc">Перелетай между лесными тропинками на крыльях бабочки (Стрелки Вверх/Вниз или свайп), собирай морской жемчуг и обходи колючки. Пройди 10 уровней и открой бесконечный режим!</p>
+        <div id="leaderboard-box">
+            <h3>🏆 Таблица рекордов (Бесконечный Ур. 11)</h3>
+            <div id="leaderboard-list"></div>
+        </div>
+        <div class="btn-group">
+            <button id="start-btn">Начать приключение</button>
+            <button id="close-records-btn" class="secondary-btn hidden">Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // =========================================================================
+    // ДЕМО / DEBUG РЕЖИМ:
+    // Поставь true, чтобы по всем 3 дорожкам шли только жемчужины (без колючек)
+    // и на весь экран моргала надпись DEBUG! Для обычной игры поставь false.
+    // =========================================================================
+    const DEBUG_MODE = false;
+
+    // =========================================================================
+    // НАСТРОЙКА КАСТОМНОГО СООБЩЕНИЯ ПОСЛЕ ПРОХОЖДЕНИЯ 10-ГО УРОВНЯ:
+    // Впиши сюда любой свой текст!
+    // =========================================================================
+    const CUSTOM_LEVEL_10_TITLE = "Поздравляем! Все 10 уровней пройдены!";
+    const CUSTOM_LEVEL_10_MESSAGE = "Ты помог волшебному котенку преодолеть все испытания и собрать лесные сокровища!\n\nТеперь тебе открыт 11-й БЕСКОНЕЧНЫЙ уровень. Собери как можно больше жемчужин и попади в таблицу рекордов!";
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const debugBanner = document.getElementById('debug-banner');
+    const levelDisplay = document.getElementById('level-display');
+    const pearlsDisplay = document.getElementById('pearls-display');
+    const targetDisplay = document.getElementById('target-display');
+    const bestDisplay = document.getElementById('best-display');
+    const livesDisplay = document.getElementById('lives-display');
+    const overlay = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlay-title');
+    const statusImg = document.getElementById('status-img');
+    const overlayDesc = document.getElementById('overlay-desc');
+    const startBtn = document.getElementById('start-btn');
+    const recordsBtn = document.getElementById('records-btn');
+    const closeRecordsBtn = document.getElementById('close-records-btn');
+    const leaderboardBox = document.getElementById('leaderboard-box');
+    const leaderboardList = document.getElementById('leaderboard-list');
+
+    if (DEBUG_MODE) {
+        debugBanner.style.display = 'flex';
+    }
+
+    // =========================================================================
+    // ИНТЕГРАЦИЯ VK BRIDGE (Шаг 2)
+    // =========================================================================
+    let vkUserName = 'Игрок';
+    let isVkEnvironment = false;
+
+    async function initVK() {
+        if (typeof vkBridge === 'undefined') {
+            console.log('VK Bridge не загружен, работаем в автономном режиме.');
+            return;
+        }
+        try {
+            // 1. Сообщаем ВКонтакте, что игра готова к отображению
+            await vkBridge.send('VKWebAppInit');
+            isVkEnvironment = true;
+            console.log('VK Bridge успешно инициализирован!');
+
+            // 2. Получаем имя и фамилию игрока ВКонтакте
+            const user = await vkBridge.send('VKWebAppGetUserInfo');
+            if (user && user.first_name) {
+                vkUserName = `${user.first_name} ${user.last_name || ''}`.trim();
+            }
+
+            // 3. Загружаем сохраненный рекорд из VK Storage
+            const storageData = await vkBridge.send('VKWebAppStorageGet', {
+                keys: ['kitten_best_score']
+            });
+            if (storageData && storageData.keys && storageData.keys[0] && storageData.keys[0].value) {
+                const vkScore = parseInt(storageData.keys[0].value, 10) || 0;
+                if (vkScore > 0) {
+                    syncVkRecordToLocal(vkScore);
+                }
+            }
+        } catch (err) {
+            console.log('Запуск вне контейнера ВКонтакте (локальный тест):', err.message || err);
+        }
+    }
+
+    function syncVkRecordToLocal(vkScore) {
+        const records = getRecords();
+        const currentBest = records.length > 0 ? records[0].score : 0;
+        if (vkScore > currentBest) {
+            saveRecordLocal(vkScore, vkUserName);
+        }
+    }
+
+    async function saveRecordToVK(score) {
+        if (!isVkEnvironment || typeof vkBridge === 'undefined') return;
+        try {
+            const records = getRecords();
+            const bestScore = records.length > 0 ? Math.max(records[0].score, score) : score;
+            await vkBridge.send('VKWebAppStorageSet', {
+                key: 'kitten_best_score',
+                value: String(bestScore)
+            });
+        } catch (err) {
+            console.warn('Не удалось сохранить рекорд в VK Storage:', err);
+        }
+    }
+
+    const LEVEL_IMAGES = [
+        'level1.jpg',
+        'level2.jpg',
+        'level3.jpg',
+        'level4.jpg',
+        'level5.jpg',
+        'level6.jpg',
+        'level7.jpg',
+        'level8.jpg',
+        'level9.jpg',
+        'level10.jpg'
+    ];
+    const GAMEOVER_IMAGE = 'gameover.jpg';
+
+    const LEVELS = [
+        { level: 1,  speed: 5.0,  target: 8,        spawnRate: 1300 },
+        { level: 2,  speed: 5.8,  target: 10,       spawnRate: 1150 },
+        { level: 3,  speed: 6.5,  target: 12,       spawnRate: 1050 },
+        { level: 4,  speed: 7.2,  target: 15,       spawnRate: 950  },
+        { level: 5,  speed: 8.0,  target: 18,       spawnRate: 880  },
+        { level: 6,  speed: 8.8,  target: 20,       spawnRate: 800  },
+        { level: 7,  speed: 9.5,  target: 22,       spawnRate: 730  },
+        { level: 8,  speed: 10.3, target: 25,       spawnRate: 670  },
+        { level: 9,  speed: 11.2, target: 28,       spawnRate: 610  },
+        { level: 10, speed: 12.2, target: 32,       spawnRate: 550  },
+        { level: 11, speed: 12.5, target: Infinity, spawnRate: 520  }
+    ];
+
+    const LANES_Y = [165, 265, 365];
+
+    let gameState = 'MENU';
+    let prevGameState = 'MENU';
+    let currentLevelIdx = 0;
+    let pearlsCollected = 0;
+    let lives = 3;
+    let items = [];
+    let particles = [];
+    let lastSpawnTime = 0;
+    let invulnerableTimer = 0;
+    let bgOffset = 0;
+
+    function getRecords() {
+        try {
+            const raw = localStorage.getItem('kitten_pearl_records');
+            return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveRecordLocal(score, playerName = vkUserName) {
+        if (score <= 0) return;
+        const records = getRecords();
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('ru-RU') + ' ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        records.push({ name: playerName, score: score, date: dateStr });
+        records.sort((a, b) => b.score - a.score);
+        const top5 = records.slice(0, 5);
+        try {
+            localStorage.setItem('kitten_pearl_records', JSON.stringify(top5));
+        } catch (e) {}
+        updateBestDisplay();
+    }
+
+    function saveRecord(score) {
+        saveRecordLocal(score, vkUserName);
+        saveRecordToVK(score);
+    }
+
+    function updateBestDisplay() {
+        const records = getRecords();
+        bestDisplay.textContent = records.length > 0 ? records[0].score : 0;
+    }
+
+    function renderLeaderboard() {
+        const records = getRecords();
+        leaderboardList.innerHTML = '';
+        if (records.length === 0) {
+            leaderboardList.innerHTML = '<div class="record-row"><span>Пока нет рекордов. Пройди 10 уровней и сыграй на 11-м!</span></div>';
+        } else {
+            records.forEach((rec, idx) => {
+                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+                const row = document.createElement('div');
+                row.className = 'record-row';
+                row.innerHTML = `<span>${medal} ${rec.name} (${rec.date})</span><span>${rec.score} жемч.</span>`;
+                leaderboardList.appendChild(row);
+            });
+        }
+        leaderboardBox.style.display = 'block';
+    }
+
+    updateBestDisplay();
+    initVK();
+
+    const clouds = [
+        { x: 110, y: 55, scale: 0.9, speed: 0.25 },
+        { x: 400, y: 40, scale: 1.25, speed: 0.18 },
+        { x: 680, y: 70, scale: 0.85, speed: 0.3 }
+    ];
+
+    const trees = [
+        { x: 60, scale: 1.05, hue: 125 },
+        { x: 240, scale: 0.85, hue: 135 },
+        { x: 430, scale: 1.2, hue: 120 },
+        { x: 640, scale: 0.95, hue: 130 },
+        { x: 840, scale: 1.1, hue: 122 }
+    ];
+
+    const bushes = [
+        { x: 120, scale: 0.9 },
+        { x: 350, scale: 1.1 },
+        { x: 590, scale: 0.85 },
+        { x: 810, scale: 1.0 }
+    ];
+
+    const cat = {
+        x: 130,
+        lane: 1,
+        y: LANES_Y[1],
+        targetY: LANES_Y[1],
+        isFlying: false,
+        flyTimer: 0
+    };
+
+    // Управление с клавиатуры (стрелки + W/S в английской И русской раскладках)
+    window.addEventListener('keydown', (e) => {
+        if (gameState !== 'PLAYING') return;
+        const keyLower = e.key.toLowerCase();
+        const isUp = e.key === 'ArrowUp' || e.code === 'KeyW' || keyLower === 'w' || keyLower === 'ц';
+        const isDown = e.key === 'ArrowDown' || e.code === 'KeyS' || keyLower === 's' || keyLower === 'ы';
+
+        if (isUp && cat.lane > 0) {
+            e.preventDefault();
+            switchLane(-1);
+        } else if (isDown && cat.lane < 2) {
+            e.preventDefault();
+            switchLane(1);
+        }
+    });
+
+    let touchStartY = 0;
+    canvas.addEventListener('touchstart', (e) => {
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    canvas.addEventListener('touchend', (e) => {
+        if (gameState !== 'PLAYING') return;
+        const diff = touchStartY - e.changedTouches[0].clientY;
+        if (Math.abs(diff) > 30) {
+            if (diff > 0 && cat.lane > 0) switchLane(-1);
+            else if (diff < 0 && cat.lane < 2) switchLane(1);
+        }
+    }, { passive: true });
+
+    function switchLane(dir) {
+        cat.lane += dir;
+        cat.targetY = LANES_Y[cat.lane];
+        cat.isFlying = true;
+        cat.flyTimer = 24;
+    }
+
+    recordsBtn.addEventListener('click', () => {
+        if (gameState === 'RECORDS') return;
+        prevGameState = gameState;
+        gameState = 'RECORDS';
+        overlayTitle.textContent = 'Таблица рекордов';
+        overlayDesc.textContent = 'Лучшие результаты в бесконечном 11-м уровне:';
+        statusImg.style.display = 'none';
+        renderLeaderboard();
+        startBtn.classList.add('hidden');
+        closeRecordsBtn.classList.remove('hidden');
+        overlay.classList.remove('hidden');
+    });
+
+    closeRecordsBtn.addEventListener('click', () => {
+        leaderboardBox.style.display = 'none';
+        closeRecordsBtn.classList.add('hidden');
+        startBtn.classList.remove('hidden');
+        gameState = prevGameState;
+        if (gameState === 'PLAYING') {
+            overlay.classList.add('hidden');
+        } else if (gameState === 'MENU') {
+            overlayTitle.textContent = 'Волшебный Котенок';
+            overlayDesc.textContent = 'Перелетай между лесными тропинками на крыльях бабочки (Стрелки Вверх/Вниз или свайп), собирай морской жемчуг и обходи колючки. Пройди 10 уровней и открой бесконечный режим!';
+        }
+    });
+
+    startBtn.addEventListener('click', () => {
+        leaderboardBox.style.display = 'none';
+        if (gameState === 'MENU' || gameState === 'GAME_OVER') {
+            currentLevelIdx = 0;
+            lives = 3;
+            startLevel();
+        } else if (gameState === 'LEVEL_UP' || gameState === 'VICTORY_10') {
+            currentLevelIdx++;
+            startLevel();
+        }
+    });
+
+    function startLevel() {
+        pearlsCollected = 0;
+        items = [];
+        particles = [];
+        cat.lane = 1;
+        cat.y = LANES_Y[1];
+        cat.targetY = LANES_Y[1];
+        cat.isFlying = false;
+        cat.flyTimer = 0;
+        invulnerableTimer = 0;
+        updateHUD();
+        statusImg.style.display = 'none';
+        leaderboardBox.style.display = 'none';
+        overlay.classList.add('hidden');
+        gameState = 'PLAYING';
+        lastSpawnTime = performance.now();
+    }
+
+    function updateHUD() {
+        const lvlData = LEVELS[currentLevelIdx];
+        levelDisplay.textContent = lvlData.level === 11 ? '11 (∞)' : `${lvlData.level}/10`;
+        pearlsDisplay.textContent = pearlsCollected;
+        targetDisplay.textContent = lvlData.target === Infinity ? '∞' : lvlData.target;
+        livesDisplay.textContent = '❤️'.repeat(Math.max(0, lives));
+    }
+
+    function createSparkles(x, y, color, count = 12, speedMult = 1) {
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = (1 + Math.random() * 3) * speedMult;
+            particles.push({
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 1.0,
+                color: color,
+                size: 1.8 + Math.random() * 2.8
+            });
+        }
+    }
+
+    function spawnItem() {
+        if (DEBUG_MODE) {
+            for (let lane = 0; lane < 3; lane++) {
+                items.push({
+                    x: canvas.width + 45,
+                    lane: lane,
+                    y: LANES_Y[lane],
+                    type: 'pearl',
+                    radius: 14
+                });
+            }
+            return;
+        }
+
+        const lane = Math.floor(Math.random() * 3);
+        const obstacleChance = Math.min(0.7, 0.4 + (currentLevelIdx * 0.025));
+        const type = Math.random() < obstacleChance ? 'obstacle' : 'pearl';
+
+        items.push({
+            x: canvas.width + 45,
+            lane: lane,
+            y: LANES_Y[lane],
+            type: type,
+            radius: type === 'pearl' ? 14 : 18
+        });
+    }
+
+    function drawBackground(speed) {
+        const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        skyGrad.addColorStop(0, '#38bdf8');
+        skyGrad.addColorStop(0.45, '#bae6fd');
+        skyGrad.addColorStop(0.75, '#fef9c3');
+        skyGrad.addColorStop(1, '#fde68a');
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const sunGrad = ctx.createRadialGradient(690, 70, 10, 690, 70, 110);
+        sunGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+        sunGrad.addColorStop(0.3, 'rgba(254, 240, 138, 0.6)');
+        sunGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
+        ctx.fillStyle = sunGrad;
+        ctx.beginPath();
+        ctx.arc(690, 70, 110, 0, Math.PI * 2);
+        ctx.fill();
+
+        clouds.forEach(c => {
+            if (gameState === 'PLAYING') c.x -= c.speed * (speed * 0.22);
+            if (c.x < -130) c.x = canvas.width + 130;
+
+            ctx.save();
+            ctx.translate(c.x, c.y);
+            ctx.scale(c.scale, c.scale);
+            ctx.fillStyle = 'rgba(186, 230, 253, 0.7)';
+            ctx.beginPath();
+            ctx.arc(0, 5, 22, 0, Math.PI * 2);
+            ctx.arc(22, 2, 26, 0, Math.PI * 2);
+            ctx.arc(46, 6, 20, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+            ctx.beginPath();
+            ctx.arc(0, 0, 22, 0, Math.PI * 2);
+            ctx.arc(22, -6, 26, 0, Math.PI * 2);
+            ctx.arc(46, 0, 20, 0, Math.PI * 2);
+            ctx.arc(22, 6, 22, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        });
+
+        ctx.fillStyle = '#86efac';
+        ctx.beginPath();
+        ctx.moveTo(0, 210);
+        ctx.quadraticCurveTo(180, 135, 390, 195);
+        ctx.quadraticCurveTo(610, 130, 800, 185);
+        ctx.lineTo(800, 450);
+        ctx.lineTo(0, 450);
+        ctx.fill();
+
+        trees.forEach(t => {
+            if (gameState === 'PLAYING') t.x -= speed * 0.35;
+            if (t.x < -90) t.x = canvas.width + 90;
+
+            ctx.save();
+            ctx.translate(t.x, 212);
+            ctx.scale(t.scale, t.scale);
+            ctx.fillStyle = 'rgba(20, 83, 45, 0.25)';
+            ctx.beginPath();
+            ctx.ellipse(0, 10, 32, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            const trunkGrad = ctx.createLinearGradient(-8, 0, 8, 0);
+            trunkGrad.addColorStop(0, '#5d4037');
+            trunkGrad.addColorStop(0.5, '#8d6e63');
+            trunkGrad.addColorStop(1, '#3e2723');
+            ctx.fillStyle = trunkGrad;
+            ctx.fillRect(-7, -40, 14, 50);
+
+            ctx.fillStyle = `hsl(${t.hue}, 55%, 35%)`;
+            ctx.beginPath();
+            ctx.arc(0, -52, 30, 0, Math.PI * 2);
+            ctx.arc(-20, -40, 22, 0, Math.PI * 2);
+            ctx.arc(20, -40, 22, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = `hsl(${t.hue}, 60%, 48%)`;
+            ctx.beginPath();
+            ctx.arc(-5, -58, 22, 0, Math.PI * 2);
+            ctx.arc(-18, -45, 15, 0, Math.PI * 2);
+            ctx.arc(14, -46, 16, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        });
+
+        const meadowGrad = ctx.createLinearGradient(0, 205, 0, canvas.height);
+        meadowGrad.addColorStop(0, '#4ade80');
+        meadowGrad.addColorStop(0.5, '#22c55e');
+        meadowGrad.addColorStop(1, '#15803d');
+        ctx.fillStyle = meadowGrad;
+        ctx.fillRect(0, 205, canvas.width, canvas.height - 205);
+
+        bushes.forEach(b => {
+            if (gameState === 'PLAYING') b.x -= speed * 0.55;
+            if (b.x < -70) b.x = canvas.width + 70;
+            ctx.save();
+            ctx.translate(b.x, 215);
+            ctx.scale(b.scale, b.scale);
+            ctx.fillStyle = '#166534';
+            ctx.beginPath();
+            ctx.arc(0, 0, 16, Math.PI, 0);
+            ctx.arc(16, 2, 12, Math.PI, 0);
+            ctx.arc(-15, 2, 13, Math.PI, 0);
+            ctx.fill();
+            ctx.restore();
+        });
+
+        if (gameState === 'PLAYING') {
+            bgOffset = (bgOffset + speed) % 100;
+        }
+
+        for (let i = 0; i < 3; i++) {
+            const trackTop = LANES_Y[i] + 16;
+            const trackHeight = 28;
+
+            ctx.fillStyle = 'rgba(5, 46, 22, 0.35)';
+            ctx.fillRect(0, trackTop + trackHeight, canvas.width, 8);
+
+            const dirtGrad = ctx.createLinearGradient(0, trackTop, 0, trackTop + trackHeight);
+            dirtGrad.addColorStop(0, '#a88467');
+            dirtGrad.addColorStop(0.3, '#85583f');
+            dirtGrad.addColorStop(0.8, '#5c3a21');
+            dirtGrad.addColorStop(1, '#3b2313');
+            ctx.fillStyle = dirtGrad;
+            ctx.fillRect(0, trackTop, canvas.width, trackHeight);
+
+            for (let x = -bgOffset; x < canvas.width; x += 100) {
+                ctx.fillStyle = '#4a2e1b';
+                ctx.beginPath();
+                ctx.ellipse(x + 25, trackTop + 16, 8, 3.5, 0.1, 0, Math.PI * 2);
+                ctx.ellipse(x + 72, trackTop + 21, 6, 2.5, -0.1, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#b08d74';
+                ctx.beginPath();
+                ctx.ellipse(x + 24, trackTop + 15, 5, 2, 0.1, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            const grassGrad = ctx.createLinearGradient(0, trackTop - 4, 0, trackTop + 8);
+            grassGrad.addColorStop(0, '#bef264');
+            grassGrad.addColorStop(0.5, '#65a30d');
+            grassGrad.addColorStop(1, '#3f6212');
+            ctx.fillStyle = grassGrad;
+            ctx.fillRect(0, trackTop - 4, canvas.width, 9);
+
+            for (let x = -bgOffset; x < canvas.width; x += 50) {
+                ctx.strokeStyle = '#84cc16';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(x + 12, trackTop - 3);
+                ctx.lineTo(x + 9, trackTop - 9);
+                ctx.moveTo(x + 15, trackTop - 3);
+                ctx.lineTo(x + 17, trackTop - 8);
+                ctx.stroke();
+
+                if ((x + i * 50) % 100 === 0) {
+                    ctx.fillStyle = i === 1 ? '#fef08a' : '#f472b6';
+                    ctx.beginPath();
+                    ctx.arc(x + 35, trackTop - 5, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+    }
+
+    function drawButterflyWing(x, y, scaleX, scaleY, rotation, isBackWing) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+        ctx.scale(scaleX, scaleY);
+
+        ctx.globalAlpha = isBackWing ? 0.65 : 0.85;
+
+        const wingGrad = ctx.createLinearGradient(0, 0, -28, -36);
+        if (isBackWing) {
+            wingGrad.addColorStop(0, '#c084fc');
+            wingGrad.addColorStop(0.6, '#818cf8');
+            wingGrad.addColorStop(1, '#38bdf8');
+        } else {
+            wingGrad.addColorStop(0, '#fef08a');
+            wingGrad.addColorStop(0.4, '#f472b6');
+            wingGrad.addColorStop(0.8, '#a855f7');
+            wingGrad.addColorStop(1, '#3b82f6');
+        }
+
+        ctx.fillStyle = wingGrad;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(-12, -32, -38, -42, -36, -18);
+        ctx.bezierCurveTo(-35, -4, -18, 2, 0, 0);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(-18, 2, -32, 16, -22, 24);
+        ctx.bezierCurveTo(-12, 28, -4, 12, 0, 0);
+        ctx.fill();
+
+        ctx.strokeStyle = isBackWing ? 'rgba(255,255,255,0.4)' : 'rgba(254, 240, 138, 0.85)';
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, 0); ctx.lineTo(-26, -22);
+        ctx.moveTo(0, 0); ctx.lineTo(-28, -10);
+        ctx.moveTo(0, 0); ctx.lineTo(-18, 14);
+        ctx.stroke();
+
+        if (!isBackWing) {
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-31, -20, 1.8, 0, Math.PI * 2);
+            ctx.arc(-30, -12, 1.5, 0, Math.PI * 2);
+            ctx.arc(-20, 18, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    function drawCat(time) {
+        const dy = cat.targetY - cat.y;
+        cat.y += dy * 0.22;
+
+        if (cat.flyTimer > 0) {
+            cat.flyTimer--;
+            if (cat.flyTimer % 3 === 0) {
+                createSparkles(cat.x - 10, cat.y - 10, Math.random() > 0.5 ? '#fde047' : '#bae6fd', 2, 0.5);
+            }
+        } else if (Math.abs(dy) < 2) {
+            cat.isFlying = false;
+        }
+
+        const altitude = Math.min(20, Math.abs(dy) * 0.35);
+        const shadowScale = Math.max(0.55, 1 - altitude / 45);
+        ctx.fillStyle = `rgba(15, 23, 42, ${0.32 * shadowScale})`;
+        ctx.beginPath();
+        ctx.ellipse(cat.x, cat.y + 21, 27 * shadowScale, 6 * shadowScale, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (invulnerableTimer > 0 && Math.floor(time / 90) % 2 === 0) return;
+
+        const runCycle = time * 0.019;
+        const bounce = cat.isFlying ? -4 : Math.abs(Math.sin(runCycle)) * -5;
+        const bodyTilt = Math.max(-0.28, Math.min(0.28, dy * 0.005));
+
+        ctx.save();
+        ctx.translate(cat.x, cat.y + bounce);
+        ctx.rotate(bodyTilt);
+
+        let backWingScaleY = 0.65 + Math.sin(runCycle * 0.5) * 0.08;
+        let backWingRot = -0.15;
+        if (cat.isFlying) {
+            const flap = Math.sin(time * 0.075);
+            backWingScaleY = 0.4 + Math.abs(flap) * 0.75;
+            backWingRot = -0.35 + flap * 0.35;
+        }
+        drawButterflyWing(-2, -6, 0.9, backWingScaleY, backWingRot, true);
+
+        const backLegSwing = cat.isFlying ? 6 : Math.sin(runCycle) * 11;
+        drawPaw(-15 - backLegSwing, 12, '#c2591b', true);
+        drawPaw(-12 + backLegSwing, 14, '#ea6c20', false);
+
+        ctx.save();
+        ctx.translate(-22, 2);
+        ctx.rotate(Math.sin(runCycle * 0.8) * 0.25);
+        const tailGrad = ctx.createLinearGradient(0, 0, -18, -30);
+        tailGrad.addColorStop(0, '#ea6c20');
+        tailGrad.addColorStop(0.75, '#fb923c');
+        tailGrad.addColorStop(1, '#fff7ed');
+        ctx.strokeStyle = tailGrad;
+        ctx.lineWidth = 8.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(-16, -4, -25, -22, -14, -31);
+        ctx.stroke();
+        ctx.restore();
+
+        const bodyGrad = ctx.createRadialGradient(2, -4, 4, 0, 3, 26);
+        bodyGrad.addColorStop(0, '#fdba74');
+        bodyGrad.addColorStop(0.55, '#f97316');
+        bodyGrad.addColorStop(1, '#c2410c');
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, 3, 24, 14.5, -0.05, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.beginPath();
+        ctx.ellipse(-2, -6, 14, 4, -0.05, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fffaf0';
+        ctx.beginPath();
+        ctx.ellipse(15, 6, 10.5, 9.5, 0.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#9a3412';
+        ctx.lineWidth = 2.6;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-7, -10); ctx.lineTo(-5, -3);
+        ctx.moveTo(-1, -11); ctx.lineTo(1, -3);
+        ctx.moveTo(5, -10);  ctx.lineTo(6, -4);
+        ctx.stroke();
+
+        const frontLegSwing = cat.isFlying ? -7 : Math.cos(runCycle) * 11;
+        drawPaw(12 - frontLegSwing, 13, '#c2591b', true);
+        drawPaw(15 + frontLegSwing, 15, '#fb923c', false);
+
+        let frontWingScaleY = 0.75 + Math.cos(runCycle * 0.5) * 0.08;
+        let frontWingRot = 0.1;
+        if (cat.isFlying) {
+            const flap = Math.cos(time * 0.075);
+            frontWingScaleY = 0.45 + Math.abs(flap) * 0.85;
+            frontWingRot = -0.15 + flap * 0.45;
+        }
+        drawButterflyWing(-4, -3, 1.05, frontWingScaleY, frontWingRot, false);
+
+        ctx.save();
+        ctx.translate(20, -8);
+        ctx.rotate(cat.isFlying ? -0.08 : Math.sin(runCycle) * 0.05);
+
+        ctx.fillStyle = 'rgba(154, 52, 18, 0.25)';
+        ctx.beginPath();
+        ctx.ellipse(-2, 12, 11, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#c2410c';
+        ctx.beginPath();
+        ctx.moveTo(-3, -10); ctx.lineTo(2, -25); ctx.lineTo(8, -12);
+        ctx.fill();
+
+        const headGrad = ctx.createRadialGradient(-3, -5, 3, 0, 0, 18);
+        headGrad.addColorStop(0, '#fed7aa');
+        headGrad.addColorStop(0.5, '#fb923c');
+        headGrad.addColorStop(1, '#ea580c');
+        ctx.fillStyle = headGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 16.5, 14.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fffaf0';
+        ctx.beginPath();
+        ctx.ellipse(9, 4.5, 8.5, 6.2, 0.1, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.moveTo(-10, -8); ctx.lineTo(-8, -25); ctx.lineTo(1, -12);
+        ctx.fill();
+        ctx.fillStyle = '#fda4af';
+        ctx.beginPath();
+        ctx.moveTo(-8, -10); ctx.lineTo(-7, -21); ctx.lineTo(-1, -12);
+        ctx.fill();
+
+        ctx.strokeStyle = '#9a3412';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(1, -13); ctx.lineTo(2, -9);
+        ctx.moveTo(5, -12); ctx.lineTo(5, -8);
+        ctx.stroke();
+
+        ctx.fillStyle = '#15803d';
+        ctx.beginPath();
+        ctx.ellipse(7, -2, 4, 4.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#4ade80';
+        ctx.beginPath();
+        ctx.ellipse(7, -1, 2.8, 3.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.ellipse(7.5, -2, 1.8, 3.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(6, -3.8, 1.4, 0, Math.PI * 2);
+        ctx.arc(8.5, -0.5, 0.7, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fb7185';
+        ctx.beginPath();
+        ctx.arc(15.8, 2, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffe4e6';
+        ctx.beginPath();
+        ctx.arc(15.2, 1.3, 0.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(12, 4); ctx.lineTo(24, 1.5);
+        ctx.moveTo(12, 6); ctx.lineTo(23, 7);
+        ctx.moveTo(11, 8); ctx.lineTo(21, 11);
+        ctx.stroke();
+
+        ctx.restore();
+        ctx.restore();
+    }
+
+    function drawPaw(x, y, furColor, isBack) {
+        ctx.fillStyle = furColor;
+        ctx.beginPath();
+        ctx.ellipse(x, y, 5.2, 6.2, 0.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = isBack ? '#e2e8f0' : '#fffaf0';
+        ctx.beginPath();
+        ctx.ellipse(x + 1, y + 3.2, 4.6, 3.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    function drawItems(time) {
+        items.forEach(item => {
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.28)';
+            ctx.beginPath();
+            ctx.ellipse(item.x, item.y + 19, item.radius * 0.95, 4.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (item.type === 'pearl') {
+                const floatY = Math.sin(time * 0.008 + item.x * 0.05) * 3.5;
+                const y = item.y + floatY;
+
+                const glowGrad = ctx.createRadialGradient(item.x, y, 3, item.x, y, item.radius + 12);
+                glowGrad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+                glowGrad.addColorStop(0.5, 'rgba(186, 230, 253, 0.45)');
+                glowGrad.addColorStop(1, 'rgba(186, 230, 253, 0)');
+                ctx.fillStyle = glowGrad;
+                ctx.beginPath();
+                ctx.arc(item.x, y, item.radius + 12, 0, Math.PI * 2);
+                ctx.fill();
+
+                const pearlGrad = ctx.createRadialGradient(item.x - 5, y - 5, 2, item.x, y, item.radius);
+                pearlGrad.addColorStop(0, '#ffffff');
+                pearlGrad.addColorStop(0.45, '#f0f9ff');
+                pearlGrad.addColorStop(0.8, '#bae6fd');
+                pearlGrad.addColorStop(1, '#7dd3fc');
+                ctx.fillStyle = pearlGrad;
+                ctx.beginPath();
+                ctx.arc(item.x, y, item.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.ellipse(item.x - 5, y - 5, 4.5, 2.5, -0.6, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                const y = item.y + 2;
+                ctx.save();
+                ctx.translate(item.x, y);
+                ctx.rotate(-time * 0.0045);
+
+                ctx.fillStyle = '#29150c';
+                const spikes = 14;
+                for (let i = 0; i < spikes; i++) {
+                    const angle = (i / spikes) * Math.PI * 2;
+                    ctx.save();
+                    ctx.rotate(angle);
+                    ctx.beginPath();
+                    ctx.moveTo(-3.2, -item.radius + 3);
+                    ctx.lineTo(0, -item.radius - 7.5);
+                    ctx.lineTo(3.2, -item.radius + 3);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                const spikeGrad = ctx.createRadialGradient(-5, -5, 3, 0, 0, item.radius);
+                spikeGrad.addColorStop(0, '#a1887f');
+                spikeGrad.addColorStop(0.55, '#5d4037');
+                spikeGrad.addColorStop(1, '#260e04');
+                ctx.fillStyle = spikeGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, item.radius - 1, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+        });
+    }
+
+    function drawParticles() {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.032;
+
+            if (p.life <= 0) {
+                particles.splice(i, 1);
+                continue;
+            }
+
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+    }
+
+    function showEndScreen(title, desc, btnText, imgSrc, showRecords = false) {
+        overlayTitle.textContent = title;
+        overlayDesc.textContent = desc;
+        startBtn.textContent = btnText;
+        if (imgSrc) {
+            statusImg.src = imgSrc;
+            statusImg.style.display = 'block';
+        } else {
+            statusImg.style.display = 'none';
+        }
+        if (showRecords) {
+            renderLeaderboard();
+        } else {
+            leaderboardBox.style.display = 'none';
+        }
+        overlay.classList.remove('hidden');
+    }
+
+    function getCurrentSpeed() {
+        const lvlData = LEVELS[currentLevelIdx];
+        if (lvlData.level === 11) {
+            return Math.min(18, lvlData.speed + Math.floor(pearlsCollected / 15) * 0.45);
+        }
+        return lvlData.speed;
+    }
+
+    function getCurrentSpawnRate() {
+        if (DEBUG_MODE) return 220;
+        const lvlData = LEVELS[currentLevelIdx];
+        if (lvlData.level === 11) {
+            return Math.max(360, lvlData.spawnRate - Math.floor(pearlsCollected / 15) * 20);
+        }
+        return lvlData.spawnRate;
+    }
+
+    function update(time) {
+        if (gameState !== 'PLAYING') return;
+
+        const lvlData = LEVELS[currentLevelIdx];
+        const currentSpeed = getCurrentSpeed();
+
+        if (invulnerableTimer > 0) {
+            invulnerableTimer -= 16;
+        }
+
+        if (time - lastSpawnTime > getCurrentSpawnRate()) {
+            spawnItem();
+            lastSpawnTime = time;
+        }
+
+        for (let i = items.length - 1; i >= 0; i--) {
+            const item = items[i];
+            item.x -= currentSpeed;
+
+            const distX = Math.abs(item.x - cat.x);
+            const distY = Math.abs(item.y - cat.y);
+
+            if (distX < 32 && distY < 25) {
+                if (item.type === 'pearl') {
+                    pearlsCollected++;
+                    createSparkles(item.x, item.y, '#fef08a', 14, 1.1);
+                    updateHUD();
+                    items.splice(i, 1);
+
+                    if (lvlData.target !== Infinity && pearlsCollected >= lvlData.target) {
+                        const completedImg = LEVEL_IMAGES[currentLevelIdx];
+                        if (currentLevelIdx < 9) {
+                            gameState = 'LEVEL_UP';
+                            showEndScreen(
+                                `Уровень ${lvlData.level} пройден!`,
+                                `Котенок в восторге! Впереди уровень ${lvlData.level + 1} — скорость увеличится.`,
+                                'Следующий уровень',
+                                completedImg
+                            );
+                        } else if (currentLevelIdx === 9) {
+                            gameState = 'VICTORY_10';
+                            showEndScreen(
+                                CUSTOM_LEVEL_10_TITLE,
+                                CUSTOM_LEVEL_10_MESSAGE,
+                                'Бесконечный уровень 11 →',
+                                completedImg
+                            );
+                        }
+                        return;
+                    }
+                    continue;
+                } else if (item.type === 'obstacle' && invulnerableTimer <= 0) {
+                    lives--;
+                    invulnerableTimer = 1200;
+                    createSparkles(cat.x, cat.y, '#fb7185', 16, 1.2);
+                    updateHUD();
+                    items.splice(i, 1);
+
+                    if (lives <= 0) {
+                        gameState = 'GAME_OVER';
+                        if (lvlData.level === 11) {
+                            saveRecord(pearlsCollected);
+                            showEndScreen(
+                                `Бесконечный забег окончен! Собрано жемчужин: ${pearlsCollected}`,
+                                'Результат записан в таблицу рекордов! Хочешь попробовать побить свой рекорд?',
+                                'Начать заново (с 1 ур.)',
+                                GAMEOVER_IMAGE,
+                                true
+                            );
+                        } else {
+                            showEndScreen(
+                                'Ой! Котенок укололся о колючку',
+                                `Котенок расстроился на ${lvlData.level} уровне. Попробуешь помочь ему еще раз?`,
+                                'Начать заново',
+                                GAMEOVER_IMAGE,
+                                false
+                            );
+                        }
+                        return;
+                    }
+                    continue;
+                }
+            }
+
+            if (item.x < -50) {
+                items.splice(i, 1);
+            }
+        }
+    }
+
+    function gameLoop(time) {
+        const currentSpeed = gameState === 'PLAYING' ? getCurrentSpeed() : 2;
+        drawBackground(currentSpeed);
+        drawItems(time);
+        drawCat(time);
+        drawParticles();
+        update(time);
+        requestAnimationFrame(gameLoop);
+    }
+
+    requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
