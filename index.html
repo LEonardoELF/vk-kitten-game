@@ -98,7 +98,6 @@
         }
         #records-btn:hover { background: rgba(255, 255, 255, 0.28); transform: none; }
 
-        /* Моргающая надпись DEBUG на весь экран */
         #debug-banner {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -122,7 +121,7 @@
         #overlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.88);
+            background: rgba(15, 23, 42, 0.9);
             backdrop-filter: blur(6px);
             display: flex;
             flex-direction: column;
@@ -137,10 +136,10 @@
             overflow-y: auto;
             z-index: 20;
         }
-        h1 { font-size: 22px; margin-bottom: 6px; color: #fb923c; text-shadow: 0 2px 10px rgba(0,0,0,0.6); }
+        h1 { font-size: 21px; margin-bottom: 6px; color: #fb923c; text-shadow: 0 2px 10px rgba(0,0,0,0.6); }
         #status-img {
             width: 100%;
-            max-width: 240px;
+            max-width: 210px;
             aspect-ratio: 16 / 9;
             object-fit: cover;
             border-radius: 12px;
@@ -149,9 +148,8 @@
             box-shadow: 0 8px 24px rgba(0,0,0,0.5);
             display: none;
         }
-        p { font-size: 13px; margin-bottom: 10px; max-width: 520px; line-height: 1.35; color: #f8fafc; white-space: pre-line; }
+        p { font-size: 13px; margin-bottom: 10px; max-width: 560px; line-height: 1.35; color: #f8fafc; white-space: pre-line; }
         
-        /* Таблица рекордов */
         #leaderboard-box {
             display: none;
             width: 100%;
@@ -235,16 +233,9 @@
 </div>
 
 <script>
-    // =========================================================================
-    // ДЕМО / DEBUG РЕЖИМ:
-    // true: уровни 1-10 — только жемчуг на всех 3 дорожках;
-    //       уровень 11 — верхняя линия жемчуг, средняя и нижняя — колючки.
-    // false: обычный игровой режим (не забудь вернуть false перед релизом!).
-    // =========================================================================
-    const DEBUG_MODE = false;
+    const DEBUG_MODE = true;
 
     const CUSTOM_LEVEL_10_TITLE = "Поздравляем! Все 10 уровней пройдены!";
-    const CUSTOM_LEVEL_10_MESSAGE = "Ты помог волшебному котенку преодолеть все испытания и собрать лесные сокровища!\n\nТеперь тебе открыт 11-й БЕСКОНЕЧНЫЙ уровень. Собери как можно больше жемчужин и попади в таблицу рекордов!";
 
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -270,7 +261,20 @@
     }
 
     let vkUserName = 'Игрок';
+    let vkFirstName = '';
+    let vkSex = 0; // 1 - женский, 2 - мужской, 0 - не указан
     let isVkEnvironment = false;
+
+    function getLevel10VictoryMessage() {
+        const personName = vkFirstName || 'Друг';
+        let verb = 'помог(ла)';
+        if (vkSex === 1) {
+            verb = 'помогла';
+        } else if (vkSex === 2) {
+            verb = 'помог';
+        }
+        return `${personName}!\nТы ${verb} волшебному котенку преодолеть все испытания и собрать лесные сокровища!\n\nТеперь тебе открыт 11-й БЕСКОНЕЧНЫЙ уровень. Собери как можно больше жемчужин и попади в таблицу рекордов!\nА еще тебя ждет сюрприз от руководителя студии "Жемчужина", для этого нужно показать скриншоты этого сообщения ей в личные сообщения!`;
+    }
 
     function applyVkInsets(insets) {
         if (!insets) return;
@@ -308,7 +312,9 @@
 
             const user = await vkBridge.send('VKWebAppGetUserInfo');
             if (user && user.first_name) {
+                vkFirstName = user.first_name.trim();
                 vkUserName = `${user.first_name} ${user.last_name || ''}`.trim();
+                vkSex = user.sex || 0;
             }
 
             const storageData = await vkBridge.send('VKWebAppStorageGet', {
@@ -560,7 +566,8 @@
         leaderboardBox.style.display = 'none';
         overlay.classList.add('hidden');
         gameState = 'PLAYING';
-        lastSpawnTime = performance.now();
+        lastSpawnTime = 0;
+        spawnItem();
     }
 
     function updateHUD() {
@@ -589,10 +596,9 @@
 
     function spawnItem() {
         if (DEBUG_MODE) {
-            const isLevel11 = LEVELS[currentLevelIdx].level === 11;
+            const isLevel11 = (LEVELS[currentLevelIdx].level === 11);
             for (let lane = 0; lane < 3; lane++) {
-                // На 11-м уровне в DEBUG_MODE: верхняя линия (0) — жемчуг, остальные (1 и 2) — колючки
-                const itemType = (isLevel11 && lane > 0) ? 'obstacle' : 'pearl';
+                const itemType = (isLevel11 && lane !== 0) ? 'obstacle' : 'pearl';
                 items.push({
                     x: canvas.width + 45,
                     lane: lane,
@@ -1148,7 +1154,7 @@
     }
 
     function getCurrentSpawnRate() {
-        if (DEBUG_MODE) return 220;
+        if (DEBUG_MODE) return 260;
         const lvlData = LEVELS[currentLevelIdx];
         if (lvlData.level === 11) {
             return Math.max(360, lvlData.spawnRate - Math.floor(pearlsCollected / 15) * 20);
@@ -1199,7 +1205,7 @@
                             gameState = 'VICTORY_10';
                             showEndScreen(
                                 CUSTOM_LEVEL_10_TITLE,
-                                CUSTOM_LEVEL_10_MESSAGE,
+                                getLevel10VictoryMessage(),
                                 'Бесконечный уровень 11 →',
                                 completedImg
                             );
