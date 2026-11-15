@@ -2,11 +2,16 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Волшебный Котенок и Жемчуг — 10 Уровней + Бесконечный режим</title>
-    <!-- Подключаем официальную библиотеку VK Bridge -->
     <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
     <style>
+        :root {
+            --vk-inset-top: 0px;
+            --vk-inset-left: 0px;
+            --vk-inset-right: 0px;
+            --vk-inset-bottom: 0px;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
         body {
             background-color: #0f172a;
@@ -14,6 +19,7 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
+            height: 100dvh;
             overflow: hidden;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: #fff;
@@ -21,12 +27,22 @@
         #game-container {
             position: relative;
             width: 100%;
+            height: 100%;
             max-width: 800px;
+            max-height: 450px;
             aspect-ratio: 16 / 9;
             border-radius: 16px;
             box-shadow: 0 20px 50px rgba(0,0,0,0.7);
             overflow: hidden;
             border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        @media (max-width: 900px) and (orientation: landscape), (max-height: 520px) {
+            #game-container {
+                max-width: 100vw;
+                max-height: 100dvh;
+                border-radius: 0;
+                border: none;
+            }
         }
         canvas {
             display: block;
@@ -40,20 +56,34 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            padding: 14px 22px;
+            padding-top: calc(max(12px, env(safe-area-inset-top)) + var(--vk-inset-top));
+            padding-left: calc(max(16px, env(safe-area-inset-left)) + var(--vk-inset-left));
+            padding-right: calc(max(16px, env(safe-area-inset-right)) + var(--vk-inset-right));
+            padding-bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--vk-inset-bottom));
         }
         .hud {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: rgba(15, 23, 42, 0.65);
+            gap: 8px;
+            background: rgba(15, 23, 42, 0.72);
             backdrop-filter: blur(6px);
-            padding: 8px 18px;
+            padding: 7px 16px;
             border-radius: 24px;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 700;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+        }
+        @media (max-height: 500px) {
+            #ui-layer {
+                /* На мобильном ВК в горизонтальном режиме системные кнопки занимают около 44-48px сверху */
+                padding-top: calc(max(46px, env(safe-area-inset-top)) + var(--vk-inset-top));
+            }
+            .hud {
+                padding: 5px 12px;
+                font-size: 13px;
+            }
         }
         .hud span { color: #fde047; }
         #records-btn {
@@ -61,8 +91,8 @@
             background: rgba(255, 255, 255, 0.15);
             border: 1px solid rgba(255, 255, 255, 0.3);
             color: #fde047;
-            padding: 4px 12px;
-            font-size: 14px;
+            padding: 4px 10px;
+            font-size: 13px;
             border-radius: 14px;
             cursor: pointer;
             box-shadow: none;
@@ -101,14 +131,17 @@
             align-items: center;
             text-align: center;
             pointer-events: auto;
-            padding: 14px 20px;
+            padding-top: calc(max(46px, env(safe-area-inset-top)) + var(--vk-inset-top));
+            padding-bottom: 14px;
+            padding-left: 20px;
+            padding-right: 20px;
             overflow-y: auto;
             z-index: 20;
         }
-        h1 { font-size: 26px; margin-bottom: 8px; color: #fb923c; text-shadow: 0 2px 10px rgba(0,0,0,0.6); }
+        h1 { font-size: 24px; margin-bottom: 8px; color: #fb923c; text-shadow: 0 2px 10px rgba(0,0,0,0.6); }
         #status-img {
             width: 100%;
-            max-width: 310px;
+            max-width: 280px;
             aspect-ratio: 16 / 9;
             object-fit: cover;
             border-radius: 12px;
@@ -117,7 +150,7 @@
             box-shadow: 0 8px 24px rgba(0,0,0,0.5);
             display: none;
         }
-        p { font-size: 15px; margin-bottom: 14px; max-width: 560px; line-height: 1.4; color: #f8fafc; white-space: pre-line; }
+        p { font-size: 14px; margin-bottom: 12px; max-width: 540px; line-height: 1.4; color: #f8fafc; white-space: pre-line; }
         
         /* Таблица рекордов */
         #leaderboard-box {
@@ -128,19 +161,19 @@
             border: 1px solid rgba(251, 146, 60, 0.5);
             border-radius: 12px;
             padding: 10px 16px;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
         #leaderboard-box h3 {
             color: #fde047;
-            font-size: 16px;
-            margin-bottom: 8px;
+            font-size: 15px;
+            margin-bottom: 6px;
         }
         .record-row {
             display: flex;
             justify-content: space-between;
             padding: 4px 8px;
             border-bottom: 1px solid rgba(255,255,255,0.1);
-            font-size: 14px;
+            font-size: 13px;
         }
         .record-row:last-child { border-bottom: none; }
         .record-row span:last-child { color: #fde047; font-weight: bold; }
@@ -155,8 +188,8 @@
             background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
             color: #fff;
             border: none;
-            padding: 11px 28px;
-            font-size: 17px;
+            padding: 10px 26px;
+            font-size: 16px;
             font-weight: bold;
             border-radius: 30px;
             cursor: pointer;
@@ -203,17 +236,8 @@
 </div>
 
 <script>
-    // =========================================================================
-    // ДЕМО / DEBUG РЕЖИМ:
-    // Поставь true, чтобы по всем 3 дорожкам шли только жемчужины (без колючек)
-    // и на весь экран моргала надпись DEBUG! Для обычной игры поставь false.
-    // =========================================================================
     const DEBUG_MODE = false;
 
-    // =========================================================================
-    // НАСТРОЙКА КАСТОМНОГО СООБЩЕНИЯ ПОСЛЕ ПРОХОЖДЕНИЯ 10-ГО УРОВНЯ:
-    // Впиши сюда любой свой текст!
-    // =========================================================================
     const CUSTOM_LEVEL_10_TITLE = "Поздравляем! Все 10 уровней пройдены!";
     const CUSTOM_LEVEL_10_MESSAGE = "Ты помог волшебному котенку преодолеть все испытания и собрать лесные сокровища!\n\nТеперь тебе открыт 11-й БЕСКОНЕЧНЫЙ уровень. Собери как можно больше жемчужин и попади в таблицу рекордов!";
 
@@ -241,29 +265,51 @@
     }
 
     // =========================================================================
-    // ИНТЕГРАЦИЯ VK BRIDGE (Шаг 2)
+    // ИНТЕГРАЦИЯ VK BRIDGE И УЧЁТ БЕЗОПАСНЫХ ОТСТУПОВ (INSETS)
     // =========================================================================
     let vkUserName = 'Игрок';
     let isVkEnvironment = false;
 
+    function applyVkInsets(insets) {
+        if (!insets) return;
+        const root = document.documentElement;
+        if (typeof insets.top === 'number') {
+            root.style.setProperty('--vk-inset-top', `${insets.top}px`);
+        }
+        if (typeof insets.left === 'number') {
+            root.style.setProperty('--vk-inset-left', `${insets.left}px`);
+        }
+        if (typeof insets.right === 'number') {
+            root.style.setProperty('--vk-inset-right', `${insets.right}px`);
+        }
+        if (typeof insets.bottom === 'number') {
+            root.style.setProperty('--vk-inset-bottom', `${insets.bottom}px`);
+        }
+    }
+
     async function initVK() {
         if (typeof vkBridge === 'undefined') {
-            console.log('VK Bridge не загружен, работаем в автономном режиме.');
             return;
         }
+
+        // Подписываемся на системные события ВК, чтобы получать высоту шапки (insets)
+        vkBridge.subscribe((e) => {
+            if (e.detail && e.detail.type === 'VKWebAppUpdateConfig') {
+                if (e.detail.data && e.detail.data.insets) {
+                    applyVkInsets(e.detail.data.insets);
+                }
+            }
+        });
+
         try {
-            // 1. Сообщаем ВКонтакте, что игра готова к отображению
             await vkBridge.send('VKWebAppInit');
             isVkEnvironment = true;
-            console.log('VK Bridge успешно инициализирован!');
 
-            // 2. Получаем имя и фамилию игрока ВКонтакте
             const user = await vkBridge.send('VKWebAppGetUserInfo');
             if (user && user.first_name) {
                 vkUserName = `${user.first_name} ${user.last_name || ''}`.trim();
             }
 
-            // 3. Загружаем сохраненный рекорд из VK Storage
             const storageData = await vkBridge.send('VKWebAppStorageGet', {
                 keys: ['kitten_best_score']
             });
@@ -274,7 +320,7 @@
                 }
             }
         } catch (err) {
-            console.log('Запуск вне контейнера ВКонтакте (локальный тест):', err.message || err);
+            console.log('Автономный запуск:', err.message || err);
         }
     }
 
@@ -328,7 +374,8 @@
         { level: 11, speed: 12.5, target: Infinity, spawnRate: 520  }
     ];
 
-    const LANES_Y = [165, 265, 365];
+    // Дорожки слегка опущены вниз, чтобы не пересекаться с верхней панелью на мобильных
+    const LANES_Y = [180, 275, 370];
 
     let gameState = 'MENU';
     let prevGameState = 'MENU';
@@ -424,7 +471,6 @@
         flyTimer: 0
     };
 
-    // Управление с клавиатуры (стрелки + W/S в английской И русской раскладках)
     window.addEventListener('keydown', (e) => {
         if (gameState !== 'PLAYING') return;
         const keyLower = e.key.toLowerCase();
