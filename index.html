@@ -27,7 +27,6 @@
         }
         #game-container {
             position: relative;
-            /* Вписываем контейнер строго в пропорции 16:9 без сплющивания */
             width: min(100vw, calc(100dvh * 16 / 9));
             height: min(100dvh, calc(100vw * 9 / 16));
             max-width: 800px;
@@ -236,7 +235,13 @@
 </div>
 
 <script>
-    const DEBUG_MODE = false;
+    // =========================================================================
+    // ДЕМО / DEBUG РЕЖИМ:
+    // true: уровни 1-10 — только жемчуг на всех 3 дорожках;
+    //       уровень 11 — верхняя линия жемчуг, средняя и нижняя — колючки.
+    // false: обычный игровой режим (не забудь вернуть false перед релизом!).
+    // =========================================================================
+    const DEBUG_MODE = true;
 
     const CUSTOM_LEVEL_10_TITLE = "Поздравляем! Все 10 уровней пройдены!";
     const CUSTOM_LEVEL_10_MESSAGE = "Ты помог волшебному котенку преодолеть все испытания и собрать лесные сокровища!\n\nТеперь тебе открыт 11-й БЕСКОНЕЧНЫЙ уровень. Собери как можно больше жемчужин и попади в таблицу рекордов!";
@@ -584,13 +589,16 @@
 
     function spawnItem() {
         if (DEBUG_MODE) {
+            const isLevel11 = LEVELS[currentLevelIdx].level === 11;
             for (let lane = 0; lane < 3; lane++) {
+                // На 11-м уровне в DEBUG_MODE: верхняя линия (0) — жемчуг, остальные (1 и 2) — колючки
+                const itemType = (isLevel11 && lane > 0) ? 'obstacle' : 'pearl';
                 items.push({
                     x: canvas.width + 45,
                     lane: lane,
                     y: LANES_Y[lane],
-                    type: 'pearl',
-                    radius: 14
+                    type: itemType,
+                    radius: itemType === 'pearl' ? 14 : 18
                 });
             }
             return;
